@@ -11,6 +11,7 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.image.ImageFilter;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Timer;
@@ -81,7 +82,6 @@ public class controller implements ActionListener, MouseListener, ChangeListener
 
     private int lengthCounter;//this is used to increment the progress bar for the song
 
-   private String albumName;
 
 
 
@@ -130,19 +130,26 @@ public class controller implements ActionListener, MouseListener, ChangeListener
                 String artistName;
                 String albumName;
                 String songLength;
+                String songName;
 
 
                 //formats into minutes and seconds
                 if (tag != null){//if theres no error reading anything from the file then read it
                     artistName = tag.getFirst(FieldKey.ALBUM_ARTIST);//uses library to get artist name metadata from the file
                     albumName = tag.getFirst(FieldKey.ALBUM);//uses library to get album name
+                     songName = tag.getFirst(FieldKey.TITLE);//uses library to get album name
+
 
                 }else{//else the albumname and artistname are gonna be empty
                     albumName = " ";
                     artistName = " ";
+                    songName = fileName;
                 }
                 songLength = String.format("%2d:%02d", minutes, seconds);//formats into minutes and seconds
 
+                if (!songName.isEmpty()){
+                    fileName = songName;
+                }
 
                 //data for the table
                     tableData[counter][0] = counter + 1;
@@ -156,7 +163,7 @@ public class controller implements ActionListener, MouseListener, ChangeListener
         }
 
     public Boolean isValidAudioFile(File audioFile){//checks if the file is an mp3 or wav
-        if (audioFile.isFile() && audioFile.getName().length() > 3) {
+        if (audioFile.isFile() && audioFile.getName().toLowerCase().length() > 3) {
             String fileName = audioFile.getName();
             if ((fileName.charAt(fileName.length() - 1) == '3' &&
                     fileName.charAt(fileName.length() - 2) == 'p' &&
@@ -198,106 +205,101 @@ public class controller implements ActionListener, MouseListener, ChangeListener
 
     }
 
+public void playSong(File musicFile) throws CannotReadException, TagException, InvalidAudioFrameException, ReadOnlyFileException, IOException {
+    playing = false;
+    if (isValidAudioFile(musicFile)) {
+        currentSongFile = musicFile;//we have a valid file
+        f = AudioFileIO.read(musicFile);//setup for the file
+        AudioHeader = f.getAudioHeader();//setup for file metadata
+        songLength = f.getAudioHeader().getTrackLength();//get the tracklength of the song so the progress bar can be updated
+    }
 
-        public void playSong(String songName) throws CannotReadException, TagException, InvalidAudioFrameException, ReadOnlyFileException, IOException {//this works, have 2 buttons, increase volume and decrease and just increase by 10 each time and decrease just as i done in this func
-            currentSongFile = null;
-            playing = false;
-            for (File file : musicFiles) {//loop through our files from the user
-                if (isValidAudioFile(file)) {//first check if the file is a valid audio file
-                    int dotIndex = file.getName().lastIndexOf('.');//gets the final dot in the string
-                    fileName = file.getName().substring(0, dotIndex);//creates substring, starts at start and ends where dot is
-                    if (fileName.equals(songName)) {
-                        currentSongFile = file;//we have a valid file
-                        globalSongName = fileName;//the globalsongname is set
-                        f = AudioFileIO.read(file);//setup for the file
-                        AudioHeader = f.getAudioHeader();//setup for file metadata
-                        songLength = f.getAudioHeader().getTrackLength();//get the tracklength of the song so the progress bar can be updated
-                    }
-                }
-            }
+    if(isMP3(currentSongFile) && mp3player != null && !isWAV(currentSongFile)){//if our file is an mp3, and our mp3 player isn't null and we don't have a wav
+        if (wavFilePlayer != null){//if our wav player is alive, kill it
+            wavFilePlayer.stop();
+            wavFilePlayer = null;
+        }
+        mp3player.stop();//stop mp3 player
+        mp3player = null;//set it as null
+        mp3player = new MP3Player(currentSongFile);//create new mp3 player with the current file to play
+        view.getPausePlayButton().setText("||");//this has to be here because the song is playing
+        mp3player.play();//play the song
+        playing = true;//its playing
+        mp3player.setRepeat(false);//so the song doesnt loop when done
 
-            if(isMP3(currentSongFile) && mp3player != null && !isWAV(currentSongFile)){//if our file is an mp3, and our mp3 player isn't null and we don't have a wav
-                if (wavFilePlayer != null){//if our wav player is alive, kill it
-                    wavFilePlayer.stop();
-                    wavFilePlayer = null;
-                }
-                mp3player.stop();//stop mp3 player
-                mp3player = null;//set it as null
-               mp3player = new MP3Player(currentSongFile);//create new mp3 player with the current file to play
-                view.getPausePlayButton().setText("||");//this has to be here because the song is playing
-                mp3player.play();//play the song
-                playing = true;//its playing
-                mp3player.setRepeat(false);//so the song doesnt loop when done
-
-                if (!audioLevelSet){//if volume level isn't already set, set it as default which is 25
-                    mp3player.setVolume(25);//set it to 25 as default
-                }
-                else{
-                    mp3player.setVolume(currentSliderLevel);//playing nextt song and keep volume consistent
-                }
+        if (!audioLevelSet){//if volume level isn't already set, set it as default which is 25
+            mp3player.setVolume(25);//set it to 25 as default
+        }
+        else{
+            mp3player.setVolume(currentSliderLevel);//playing nextt song and keep volume consistent
+        }
+    }
+    else if (isMP3(currentSongFile) && mp3player == null){//if we're trying to play an mp3 for the first time, play it
+        mp3player = new MP3Player(currentSongFile);
+        view.getPausePlayButton().setText("||");//this has to be here because the song is playing
+        mp3player.play();//play the song
+        playing = true;//its playing
+        mp3player.setRepeat(false);//so the song doesnt loop when done
+        if (!audioLevelSet){//if volume level isn't already set, set it as default which is 25
+            mp3player.setVolume(25);//set it to 25 as default
+        }
+        else{
+            mp3player.setVolume(currentSliderLevel);//playing nextt song and keep volume consistent
+        }
+        if (wavFilePlayer != null){//if the wav file player isn't null, stop it and set it null
+            wavFilePlayer.stop();
+            wavFilePlayer = null;//set the wavplayer as null
+        }
+    }
+    try {
+        //if we dont have an mp3, we have a wav
+        if ((isWAV(currentSongFile)) && !playing){//if its a wav
+            if (mp3player != null){//if a song is already playing and its mp3, stop it and make it null
+                mp3player.stop();
+                mp3player = null;
             }
-            else if (isMP3(currentSongFile) && mp3player == null){//if we're trying to play an mp3 for the first time, play it
-                mp3player = new MP3Player(currentSongFile);
-                view.getPausePlayButton().setText("||");//this has to be here because the song is playing
-                mp3player.play();//play the song
-                playing = true;//its playing
-                if (!audioLevelSet){//if volume level isn't already set, set it as default which is 25
-                    mp3player.setVolume(25);//set it to 25 as default
-                }
-                else{
-                    mp3player.setVolume(currentSliderLevel);//playing nextt song and keep volume consistent
-                }
-                if (wavFilePlayer != null){//if the wav file player isn't null, stop it and set it null
-                    wavFilePlayer.stop();
-                    wavFilePlayer = null;//set the wavplayer as null
-                }
+            if (wavFilePlayer != null){//if the wav player is already playing, stop it and set it to null
+                wavFilePlayer.stop();
+                wavFilePlayer = null;
             }
-            try {
-                //if we dont have an mp3, we have a wav
-                if ((isWAV(currentSongFile)) && !playing){//if its a wav
-                    if (mp3player != null){//if a song is already playing and its mp3, stop it and make it null
-                        mp3player.stop();
-                        mp3player = null;
-                    }
-                    if (wavFilePlayer != null){//if the wav player is already playing, stop it and set it to null
-                        wavFilePlayer.stop();
-                        wavFilePlayer = null;
-                    }
-                    AudioInputStream audioStream = AudioSystem.getAudioInputStream(currentSongFile);
-                    wavFilePlayer = AudioSystem.getClip();
-                    wavFilePlayer.open(audioStream);
-                    wavFilePlayer.start();//starts the song, has to go after the thing above so audio level stays the same
-                    playing = true;//we're playing
-                    currentSliderLevel = view.getAudioSlider().getValue();
-                    int wavAudioLevel = 50 + (int) Math.round((currentSliderLevel - 1) * (100 - 50) / 99.0);//calculation for the sweetspot
-                    FloatControl gainControl = (FloatControl) wavFilePlayer.getControl(FloatControl.Type.MASTER_GAIN);//gettin the players audio
-                    float minGain = gainControl.getMinimum();//getting min gain
-                    float maxGain = gainControl.getMaximum();//gettin max gain
-                    float mappedGain = minGain + (wavAudioLevel / 100.0f) * (maxGain - minGain);//calculations to make wav player audio level sound close to mp3
-                    gainControl.setValue(mappedGain);
-                    long microsecondLength = wavFilePlayer.getMicrosecondLength();//wav player gets in microseconds
-                    double secondLength = (double) microsecondLength / 1_000_000.0;//conver the microseconds to actual seconds
-                    songLength = (int) secondLength;//casts it to an int. for the updatesonglength function to use
-                }
-
-                if (playing){//if any song is playing, mp3 or wav
-                    view.getPausePlayButton().setText("||");//this has to be here because the song is playing
-                    view.getCurrentlyPlaying().setText(globalSongName);//shows the song playing in the bottom left
-                    view.getCurrentArtistLabel().setText(artistName);//shows the artist name in the bottom left
-                    view.getPausePlayButton().setText("||");//this has to be here because the song is playing so the next operation would be pause
-                    updateSongLength(songLength);//update the audio lengh bar in the playerpanel for each respective song
-                    getArtWork(currentSongFile);//gets the artwork for the song and shows it to the user
-                }
-            } catch (Exception ignore) {//if there is any sort of problem with the song, it'll change the album image and say bad file
-                System.out.println("Can't successfully retreive all info from file.");
-                ImageIcon originalAlbumBackground = new ImageIcon(getClass().getResource("audioImage.png"));
-                ImageIcon resizedAlbumBackground = new ImageIcon(originalAlbumBackground.getImage().getScaledInstance(70, 65, Image.SCALE_SMOOTH));
-                view.getAlbumLabel().setIcon(resizedAlbumBackground);
-            }
+            AudioInputStream audioStream = AudioSystem.getAudioInputStream(currentSongFile);
+            wavFilePlayer = AudioSystem.getClip();
+            wavFilePlayer.open(audioStream);
+            wavFilePlayer.start();//starts the song, has to go after the thing above so audio level stays the same
+            playing = true;//we're playing
+            currentSliderLevel = view.getAudioSlider().getValue();
+            int wavAudioLevel = 50 + (int) Math.round((currentSliderLevel - 1) * (100 - 50) / 99.0);//calculation for the sweetspot
+            FloatControl gainControl = (FloatControl) wavFilePlayer.getControl(FloatControl.Type.MASTER_GAIN);//gettin the players audio
+            float minGain = gainControl.getMinimum();//getting min gain
+            float maxGain = gainControl.getMaximum();//gettin max gain
+            float mappedGain = minGain + (wavAudioLevel / 100.0f) * (maxGain - minGain);//calculations to make wav player audio level sound close to mp3
+            gainControl.setValue(mappedGain);
+            long microsecondLength = wavFilePlayer.getMicrosecondLength();//wav player gets in microseconds
+            double secondLength = (double) microsecondLength / 1_000_000.0;//conver the microseconds to actual seconds
+            songLength = (int) secondLength;//casts it to an int. for the updatesonglength function to use
         }
 
+        if (playing){//if any song is playing, mp3 or wav
+            view.getPausePlayButton().setText("||");//this has to be here because the song is playing
+            view.getCurrentlyPlaying().setText(globalSongName);//shows the song playing in the bottom left
+            view.getCurrentArtistLabel().setText(artistName);//shows the artist name in the bottom left
+            view.getPausePlayButton().setText("||");//this has to be here because the song is playing so the next operation would be pause
+            updateSongLength(songLength);//update the audio lengh bar in the playerpanel for each respective song
+            getArtWork(currentSongFile);//gets the artwork for the song and shows it to the user
+        }
+    } catch (Exception ignore) {//if there is any sort of problem with the song, it'll change the album image and say bad file
+        System.out.println("Can't successfully retreive all info from file.");
+        ImageIcon originalAlbumBackground = new ImageIcon(getClass().getResource("/assets/audioImage.png"));
+        ImageIcon resizedAlbumBackground = new ImageIcon(originalAlbumBackground.getImage().getScaledInstance(70, 65, Image.SCALE_SMOOTH));
+        view.getAlbumLabel().setIcon(resizedAlbumBackground);
+    }
 
-        public void getArtWork(File currentFile) throws CannotReadException, TagException, InvalidAudioFrameException, ReadOnlyFileException, IOException {//this gets the artwork and updates the label in the gui showing the current artwork
+    }
+
+
+
+    //this gets the artwork and updates the label in the gui showing the current artwork
+        public void getArtWork(File currentFile) throws CannotReadException, TagException, InvalidAudioFrameException, ReadOnlyFileException, IOException {
              AudioFile tagFile = AudioFileIO.read(currentFile);//library to read metadata
                 Tag ArtWorkTag = f.getTag();//library to get the tag
             if (ArtWorkTag.getFirstArtwork().getBinaryData() != null) {
@@ -308,7 +310,6 @@ public class controller implements ActionListener, MouseListener, ChangeListener
                 ImageIcon resizedIcon = new ImageIcon(resizedImage); // Set the resized ImageIcon as the icon for the JLabel
                 view.getAlbumLabel().setIcon(resizedIcon);//updates the label in the view
             }
-
         }
 
 
@@ -320,7 +321,7 @@ public class controller implements ActionListener, MouseListener, ChangeListener
         return this.Songs;
     }
 
-    public void pauseSong() {//if wav is playing and not null, play it, if mp3 is not null and isn't paused, play it
+    public void pauseSong() throws CannotReadException, TagException, InvalidAudioFrameException, ReadOnlyFileException, IOException {//if wav is playing and not null, play it, if mp3 is not null and isn't paused, play it
         if (wavFilePlayer != null && wavFilePlayer.isRunning()) {//if we have a wav file playing
             paused = true;
             wavFilePlayer.stop();
@@ -336,7 +337,7 @@ public class controller implements ActionListener, MouseListener, ChangeListener
 
 
 
-    public void unpauseSong() {//if wav isnt null and isnt running, play it, if mp3 isnt null and is paused, play it
+    public void unpauseSong() throws CannotReadException, TagException, InvalidAudioFrameException, ReadOnlyFileException, IOException {//if wav isnt null and isnt running, play it, if mp3 isnt null and is paused, play it
         if (wavFilePlayer != null && !wavFilePlayer.isRunning()) {//if we have a wav file
             wavFilePlayer.start();
             paused = false;
@@ -346,13 +347,32 @@ public class controller implements ActionListener, MouseListener, ChangeListener
             mp3player.play();
             view.getPausePlayButton().setText("||");
         }
+        if (currentSongFile != null){
+            if (mp3player != null && mp3player.isStopped()){
+                playSong(currentSongFile);
+            }
+            else if (wavFilePlayer != null && !wavFilePlayer.isRunning()){
+                playSong(currentSongFile);
+            }
+        }
     }
 
     public void playNextSong() throws CannotReadException, TagException, InvalidAudioFrameException, ReadOnlyFileException, IOException {//play the next song
          row = row + 1;//getting the next row of the table
         if (playing && row >= 0 && row <= view.getMusicTable().getRowCount() - 1){//if a song is playing and the row isn't negative or the row we're on isn't greater than the amount of total rows
             String songName = (String) view.getMusicTable().getValueAt(row, 1);//gets the actual song name from the row clicked
-            playSong(songName);//play the song in the row and column
+            artistName = (String) view.getMusicTable().getValueAt(row, 2);//gets the actual song name from the row clicked
+            String artistAlbum = (String) view.getMusicTable().getValueAt(row, 3);//gets the actual song name from the row clicked
+
+            globalSongName = (String) view.getMusicTable().getValueAt(row, 1);//gets the actual song name from the row clicked
+
+            try {
+                File musicFile = findSong(songName,artistName,artistAlbum);//finds the file from the findSong Function
+                playSong(musicFile);//actually plays the song if its found
+            } catch (CannotReadException | TagException | InvalidAudioFrameException | ReadOnlyFileException |
+                     IOException ex) {
+                throw new RuntimeException(ex);
+            }
             view.getMusicTable().clearSelection();//clears the previously highlighted song
             view.getMusicTable().setRowSelectionInterval(row, row);//highlights the new row
             addSongToList();//adds the current song played to the arraylist
@@ -370,9 +390,19 @@ public class controller implements ActionListener, MouseListener, ChangeListener
     public void playPreviousSong() throws CannotReadException, TagException, InvalidAudioFrameException, ReadOnlyFileException, IOException {//play the previous song
         row = row - 1;//getting the previous row
         if (playing && row != -1){//if a song is playing and if we're not negative in our rows, rows start at index 0
-
             String songName = (String) view.getMusicTable().getValueAt(row, 1);//gets the actual song name from the row clicked
-            playSong(songName);//play the song in the row and column
+             artistName = (String) view.getMusicTable().getValueAt(row, 2);//gets the actual song name from the row clicked
+            String artistAlbum = (String) view.getMusicTable().getValueAt(row, 3);//gets the actual song name from the row clicked
+
+            globalSongName = (String) view.getMusicTable().getValueAt(row, 1);//gets the actual song name from the row clicked
+
+            try {
+                File musicFile = findSong(songName,artistName,artistAlbum);//finds the file from the table
+                playSong(musicFile);//calls playSong to play the actual file
+            } catch (CannotReadException | TagException | InvalidAudioFrameException | ReadOnlyFileException |
+                     IOException ex) {
+                throw new RuntimeException(ex);
+            }
             view.getMusicTable().clearSelection();//clears the previously highlighted song
             view.getMusicTable().setRowSelectionInterval(row, row);//highlights the row
             addSongToList();//adds the current song played to the list
@@ -559,7 +589,12 @@ public class controller implements ActionListener, MouseListener, ChangeListener
             }
             else if (e.getSource() == view.getPausePlayButton()){//play button cannot be clicked if nothings playing
                 if (!view.getCurrentlyPlaying().getText().equals(" ")){
-                    pauseSong();
+                    try {
+                        pauseSong();
+                    } catch (CannotReadException | TagException | InvalidAudioFrameException | ReadOnlyFileException |
+                             IOException ex) {
+                        throw new RuntimeException(ex);
+                    }
                 }
             }
             else if (e.getSource() == view.getNextButton()){
@@ -591,17 +626,59 @@ public class controller implements ActionListener, MouseListener, ChangeListener
         }
     }
 
+    //This finds the song and passes it to play song to actually play the song from the table
+    public File findSong(String songName, String artistName, String artistAlbum) throws CannotReadException, TagException, InvalidAudioFrameException, ReadOnlyFileException, IOException {
+        for (int i = 0; i < musicFiles.length; i++) {
+            if (isValidAudioFile(musicFiles[i])) {
+                AudioFile tagFile = AudioFileIO.read(musicFiles[i]);//library to read the file
+                Tag fileTag = tagFile.getTag();//library is reading the tags of the file
+
+                //initializing the metadata
+                String title;
+                String artist;
+                String album;
+
+                if (fileTag != null) {//if its not null reading a file, grab the data
+                    title = fileTag.getFirst(FieldKey.TITLE);
+                    artist = fileTag.getFirst(FieldKey.ALBUM_ARTIST);
+                    album = fileTag.getFirst(FieldKey.ALBUM);
+                } else {
+                    title = "";
+                    artist = "";
+                    album = "";
+                }
+
+                int dotIndex = musicFiles[i].getName().lastIndexOf('.');//if we have no metadata, grab the original file name and stop at extension
+                String nameWithoutExtension = musicFiles[i].getName().substring(0, dotIndex);//gets the filename without the extension
+
+                if (!title.isEmpty() && songName.equals(title) && artistName.equals(artist) && artistAlbum.equals(album)) {//if we have metadata, return the file for playSong
+                    return musicFiles[i];
+                } else if (songName.equals(nameWithoutExtension) && title.isEmpty()) {//if we dont have valid metadata, just get the files original name and return it for playSong to use
+                    return musicFiles[i];
+                }
+            }
+        }
+        return null;
+    }
+
 
     @Override
     public void mouseClicked(MouseEvent e) {//for the table row clicks
         row = view.getMusicTable().rowAtPoint(e.getPoint());//gets the row
         String songName = (String) view.getMusicTable().getValueAt(row, 1);//gets the actual song name from the row clicked
+        artistName = (String) view.getMusicTable().getValueAt(row, 2);//gets the actual song name from the row clicked
+        String artistAlbum = (String) view.getMusicTable().getValueAt(row, 3);//gets the actual song name from the row clicked
+
+        globalSongName = (String) view.getMusicTable().getValueAt(row, 1);//gets the actual song name from the row clicked
+
         try {
-            playSong(songName);//play the song in the row and column
+           File musicFile = findSong(songName,artistName,artistAlbum);//finds the song from the table
+           playSong(musicFile);//plays the song when its found
         } catch (CannotReadException | TagException | InvalidAudioFrameException | ReadOnlyFileException |
                  IOException ex) {
             throw new RuntimeException(ex);
         }
+
         view.getMusicTable().setRowSelectionInterval(row, row);//highlights the row
         artistName = (String) view.getMusicTable().getValueAt(row, 2);//gets the actual song name from the row clicked
         view.getCurrentArtistLabel().setText(artistName);//updates label in the playerpanel

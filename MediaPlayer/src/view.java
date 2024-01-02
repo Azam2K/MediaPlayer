@@ -154,7 +154,7 @@ public class view  {
         profilePanel.setBounds(0,0,200,180);
         profilePanel.setBorder(new LineBorder(Color.darkGray));
 
-        ImageIcon originalProfilePicture = new ImageIcon(getClass().getResource("user.png"));
+        ImageIcon originalProfilePicture = new ImageIcon(getClass().getResource("/assets/user.png"));
         ImageIcon resizedProfilePicture = new ImageIcon(originalProfilePicture.getImage().getScaledInstance(200, 150, Image.SCALE_SMOOTH));
         profilePicture.setIcon(resizedProfilePicture);
         profilePanel.add(profilePicture);
@@ -329,7 +329,7 @@ public class view  {
         nextButton.setForeground(Color.white);
 
             //for the album image
-        ImageIcon originalAlbumBackground = new ImageIcon(getClass().getResource("audioImage.png"));
+        ImageIcon originalAlbumBackground = new ImageIcon(getClass().getResource("/assets/audioImage.png"));
         ImageIcon resizedAlbumBackground = new ImageIcon(originalAlbumBackground.getImage().getScaledInstance(70, 65, Image.SCALE_SMOOTH));
         albumLabel.setIcon(resizedAlbumBackground);
         playerPanel.add(albumLabel);
