@@ -2,7 +2,7 @@
 A Java based GUI Media Player for MP3 and WAV files.
 
 
-Features Include:
+###Features Include:
 
 1. Playing MP3 and WAV Files
 2. Playback Features
@@ -10,7 +10,7 @@ Features Include:
 4. Top Played Songs in Current Session
 
 
-How to use:
+###How to use:
 
 1. Launch Main.java
 2. Navigate to Settings in the Sidebar
